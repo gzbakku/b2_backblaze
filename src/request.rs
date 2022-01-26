@@ -4,7 +4,7 @@ use reqwest;
 use crate::{UploadToken,FileInfo};
 
 pub async fn json(
-    uri:&'static str,
+    uri:&str,
     headers:Vec<(String,String)>,
     data:JsonValue
 )->Result<JsonValue,&'static str>{
@@ -51,6 +51,7 @@ pub async fn json(
 
 }
 
+#[allow(dead_code)]
 pub async fn upload(
     upload_path:String,
     file_path:String,
@@ -63,7 +64,7 @@ pub async fn upload(
         Err(_e)=>{return Err(_e);}
     }
 
-    let mut builder = reqwest::Client::new()
+    let builder = reqwest::Client::new()
     .post(upload_token.uploadUrl)
     .body(file_info.data)
     .header("Authorization",upload_token.authorizationToken)
@@ -86,6 +87,10 @@ pub async fn upload(
         Err(_e)=>{
             return Err("failed-execute-request");
         }
+    }
+
+    if response.status() != 200{
+        return Err("failed-response");
     }
 
     let response_body:String;

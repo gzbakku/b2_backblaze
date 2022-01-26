@@ -4,6 +4,7 @@ use crate::{Config,request};
 use std::time::Instant;
 use base64::encode as Base64Encode;
 
+#[allow(non_snake_case)]
 pub struct B2{
     pub token_time:Instant,
     pub config:Config,
@@ -14,6 +15,7 @@ pub struct B2{
     pub bucketId:String,
 }
 
+#[allow(non_snake_case)]
 #[derive(Default,Debug)]
 pub struct UploadToken{
     pub uploadUrl:String,
@@ -56,10 +58,14 @@ impl B2{
     }
     pub async fn upload(
         &mut self,
-        mut upload_path:String,
+        upload_path:String,
         file_path:String
     )->Result<(),&'static str>{
-        match login(self).await{
+        match upload(
+            self,
+            upload_path,
+            file_path
+        ).await{
             Ok(_)=>{return Ok(());},
             Err(e)=>{return Err(e);}
         }
@@ -72,13 +78,13 @@ async fn upload(
     file_path:String
 )->Result<JsonValue,&'static str>{
 
+    while upload_path.contains("%"){upload_path = upload_path.replace("%", "%25");}
     while upload_path.contains("\""){upload_path = upload_path.replace("\"", "%22");}
     while upload_path.contains("'"){upload_path = upload_path.replace("'", "%27");}
     while upload_path.contains("."){upload_path = upload_path.replace(".", "%2E");}
     while upload_path.contains("#"){upload_path = upload_path.replace("#", "%23");}
     while upload_path.contains("+"){upload_path = upload_path.replace("+", "%2B");}
     while upload_path.contains(","){upload_path = upload_path.replace(",", "%2C");}
-    while upload_path.contains("%"){upload_path = upload_path.replace("%", "%25");}
     while upload_path.contains("\\"){upload_path = upload_path.replace("\\", "%5C");}
     while upload_path.contains(" "){upload_path = upload_path.replace(" ", "%20");}
 
@@ -165,7 +171,7 @@ async fn get_upload_token(b2:&mut B2)->Result<UploadToken,&'static str>{
 
     let response:JsonValue;
     match request::json(
-        "https://api.backblazeb2.com/b2api/v2/b2_authorize_account",
+        &format!("{}/b2api/v2/b2_get_upload_url",b2.apiUrl),
         vec![
             (
                 "Authorization".to_string(),

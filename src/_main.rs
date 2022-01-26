@@ -11,6 +11,21 @@ pub use io::FileInfo;
 async fn main() {
 
     if false{
+        return;
+    }
+
+    let id:String;
+    match std::env::var("B2_ID") {
+        Ok(v)=>{id = v;},
+        Err(_e)=>{return println!("failed-get-B2_ID : {:?}",_e);}
+    }
+    let key:String;
+    match std::env::var("B2_KEY") {
+        Ok(v)=>{key = v;},
+        Err(_e)=>{return println!("failed-get-B2_KEY : {:?}",_e);}
+    }
+
+    if false{
         match io::get_file("d://workstation/expo/rust/letterman/letterman/drink.png").await{
             Ok(_)=>{
                 println!("successfull io-get_file");
@@ -22,11 +37,12 @@ async fn main() {
     }
 
     let mut client = B2::new(Config::new(
-        "ID".to_string(),
-        "KEY".to_string()
+        id,
+        key
     ));
 
     client.set_bucket_id("70660217d75b3a7a77900d14".to_string());
+
     match client.login().await{
         Ok(_)=>{
             println!(">>> login successfull");
@@ -42,7 +58,7 @@ async fn main() {
                 println!(">>> upload_token successfull");
             },
             Err(_e)=>{
-                return println!("!!! login failed : {:?}",_e);
+                return println!("!!! upload_token failed : {:?}",_e);
             }
         }
     }
@@ -56,15 +72,15 @@ async fn main() {
                 println!(">>> upload successfull");
             },
             Err(_e)=>{
-                return println!("!!! login failed : {:?}",_e);
+                return println!("!!! upload failed : {:?}",_e);
             }
         }
     }
 
 }
 
-#[tokio::main]
-async fn main() {
+// #[tokio::main]
+async fn another() {
 
     //start b2 client
     let mut client = B2::new(Config::new(
