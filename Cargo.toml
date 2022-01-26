@@ -1,0 +1,23 @@
+[package]
+name = "b2_backblaze"
+version = "0.1.0"
+edition = "2021"
+
+description = "this is a basic async library to upload small files to backblaze b2 service."
+homepage = "https://github.com/gzbakku/b2_backblaze"
+repository = "https://github.com/gzbakku/b2_backblaze"
+readme = "README.md"
+keywords = ["b2","backblaze","client","upload","api"]
+categories = ["asynchronous", "api-bindings"]
+license = "GPL-3.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+reqwest = {version="0.11.8",features=["json"]}
+tokio = { version = "1.15.0", features = ["full"] }
+json = "0.12.4"
+base64 = "0.13.0"
+new_mime_guess = "4.0.0"
+sha1 = "0.10.0"
+hex = "0.4.3"
