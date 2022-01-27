@@ -14,8 +14,8 @@ pub async fn json(
     .body(stringify(data))
     .header("Content-Type","application/json");
 
-    for header in headers{
-        builder = builder.header(header.0,header.1);
+    for (key,value) in headers.iter(){
+        builder = builder.header(key,value);
     }
 
     let request:reqwest::Request;
