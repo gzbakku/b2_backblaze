@@ -1,5 +1,5 @@
 
-
+#[derive(Debug,Clone)]
 pub struct Config{
     pub id:String,
     pub key:String,

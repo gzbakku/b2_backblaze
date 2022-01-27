@@ -4,6 +4,7 @@ use crate::{Config,request};
 use std::time::Instant;
 use base64::encode as Base64Encode;
 
+#[derive(Debug,Clone)]
 #[allow(non_snake_case)]
 pub struct B2{
     pub token_time:Instant,
