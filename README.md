@@ -1,6 +1,12 @@
 # b2-backblaze
 
-this is a basic async library to upload small files to backblaze b2 service
+this is a full support async library to access backblaze b2 service backend apis.
+
+## features
+
+- single file upload
+- large and single file apis
+- v3 support
    
 ## sample code  
 

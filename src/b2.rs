@@ -23,6 +23,15 @@ pub struct UploadToken{
     pub authorizationToken:String
 }
 
+impl UploadToken{
+    pub fn json(self)->JsonValue{
+        object!{
+            uploadUrl:self.uploadUrl,
+            authorizationToken:self.authorizationToken 
+        }
+    }
+}
+
 impl B2{
     pub fn new(config:Config)->B2{
         B2{
@@ -48,6 +57,31 @@ impl B2{
             Err(e)=>{return Err(e);}
         }
     }
+
+    pub async fn start_large_file(
+        &mut self,
+        bucketId:&str,
+        fileName:&str,
+        contentType:&str,
+    )->Result<JsonValue,&'static str>{
+        match start_large_file(self,bucketId,fileName,contentType).await{
+            Ok(v)=>{return Ok(v);},
+            Err(e)=>{return Err(e);}
+        }
+    }
+    pub async fn get_part_upload_token(&mut self,fileId:&str)->Result<UploadToken,&'static str>{
+        match get_part_upload_token(self,fileId).await{
+            Ok(v)=>{return Ok(v);},
+            Err(e)=>{return Err(e);}
+        }
+    }
+    pub async fn finish_large_file(&mut self,fileId:&str,partSha1Array:JsonValue)->Result<(),&'static str>{
+        match finish_large_file(self,fileId,partSha1Array).await{
+            Ok(v)=>{return Ok(());},
+            Err(e)=>{return Err(e);}
+        }
+    }
+
     pub async fn check_token(&mut self)->Result<(),&'static str>{
         if self.token_time.elapsed().as_secs() > 43200{
             match self.login().await{
@@ -172,7 +206,7 @@ async fn get_upload_token(b2:&mut B2)->Result<UploadToken,&'static str>{
 
     let response:JsonValue;
     match request::json(
-        &format!("{}/b2api/v2/b2_get_upload_url",b2.apiUrl),
+        &format!("{}/b2api/v3/b2_get_upload_url",b2.apiUrl),
         vec![
             (
                 "Authorization".to_string(),
@@ -210,3 +244,161 @@ async fn get_upload_token(b2:&mut B2)->Result<UploadToken,&'static str>{
     return Ok(build);
 
 }
+
+async fn start_large_file(
+    b2:&mut B2,
+    bucketId:&str,
+    fileName:&str,
+    contentType:&str,
+)->Result<JsonValue,&'static str>{
+
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
+
+    let bid;
+    if bucketId.len() > 0{
+        bid = bucketId;
+    } else {
+        bid = &b2.bucketId;
+    }
+
+    let ct;
+    if contentType.len() > 0{
+        ct = contentType;
+    } else {
+        ct = "b2/x-auto";
+    }
+
+    let response:JsonValue;
+    match request::json(
+        &format!("{}/b2api/v2/b2_start_large_file",b2.apiUrl),
+        vec![
+            (
+                "Authorization".to_string(),
+                b2.authorizationToken.clone()
+            )
+        ],
+        object!{
+            bucketId:JsonValue::String(bid.to_string()),
+            fileName:JsonValue::String(fileName.to_string()),
+            contentType:JsonValue::String(ct.to_string())
+        }
+    ).await{
+        Ok(v)=>{response = v;},
+        Err(_)=>{
+            return Err("failed-response");
+        }
+    }
+
+    if 
+        !response["fileId"].is_string()
+    {
+        return Err("invalid-response");
+    }
+
+    let build = object!{
+        fileId:response["fileId"].clone()
+    };
+
+    return Ok(build);
+
+}
+
+async fn get_part_upload_token(b2:&mut B2,fileId:&str)->Result<UploadToken,&'static str>{
+
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
+
+    let response:JsonValue;
+    match request::json(
+        &format!("{}/b2api/v2/b2_get_upload_part_url",b2.apiUrl),
+        vec![
+            (
+                "Authorization".to_string(),
+                b2.authorizationToken.clone()
+            )
+        ],
+        object!{
+            fileId:fileId
+        }
+    ).await{
+        Ok(v)=>{response = v;},
+        Err(_)=>{
+            return Err("failed-response");
+        }
+    }
+
+    if 
+        !response["uploadUrl"].is_string() || 
+        !response["authorizationToken"].is_string()
+    {
+        return Err("invalid-response");
+    }
+
+    let mut build = UploadToken::default();
+
+    match response["uploadUrl"].as_str(){
+        Some(v)=>{build.uploadUrl = v.to_string();},
+        None=>{return Err("failed-get-uploadUrl");}
+    }
+    match response["authorizationToken"].as_str(){
+        Some(v)=>{build.authorizationToken = v.to_string();},
+        None=>{return Err("failed-get-authorizationToken");}
+    }
+
+    return Ok(build);
+
+}
+
+async fn finish_large_file(b2:&mut B2,fileId:&str,partSha1Array:JsonValue)->Result<(),&'static str>{
+
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
+
+    let response:JsonValue;
+    match request::json(
+        &format!("{}/b2api/v3/b2_finish_large_file",b2.apiUrl),
+        vec![
+            (
+                "Authorization".to_string(),
+                b2.authorizationToken.clone()
+            )
+        ],
+        object!{
+            fileId:fileId,
+            partSha1Array:partSha1Array
+        }
+    ).await{
+        Ok(v)=>{response = v;},
+        Err(_)=>{
+            return Err("failed-response");
+        }
+    }
+
+    if !response["action"].is_string(){
+        return Err("invalid-response");
+    }
+
+    match response["action"].as_str(){
+        Some(v)=>{
+            if v == "upload"{
+                Ok(())
+            } else {
+                return Err("action_not_upload");
+            }
+        },
+        None=>{return Err("failed-get-action");}
+    }
+
+}
+
+
+
+
+

@@ -8,22 +8,22 @@ pub use b2::{B2,UploadToken};
 pub use io::FileInfo;
 
 #[tokio::main]
-async fn main() {
+async fn main(){
 
     if false{
         return;
     }
 
-    let id:String;
-    match std::env::var("B2_ID") {
-        Ok(v)=>{id = v;},
-        Err(_e)=>{return println!("failed-get-B2_ID : {:?}",_e);}
-    }
-    let key:String;
-    match std::env::var("B2_KEY") {
-        Ok(v)=>{key = v;},
-        Err(_e)=>{return println!("failed-get-B2_KEY : {:?}",_e);}
-    }
+    // let id:String;
+    // match std::env::var("B2_ID") {
+    //     Ok(v)=>{id = v;},
+    //     Err(_e)=>{return println!("failed-get-B2_ID : {:?}",_e);}
+    // }
+    // let key:String;
+    // match std::env::var("B2_KEY") {
+    //     Ok(v)=>{key = v;},
+    //     Err(_e)=>{return println!("failed-get-B2_KEY : {:?}",_e);}
+    // }
 
     if false{
         match io::get_file("d://workstation/expo/rust/letterman/letterman/drink.png").await{
@@ -36,10 +36,11 @@ async fn main() {
         }
     }
 
-    let mut client = B2::new(Config::new(
-        id,
-        key
-    ));
+    let conf = Config::from_file(
+        "D:\\workstation\\expo\\silvergram\\creds\\b2.json"
+    ).await.unwrap();
+
+    let mut client = B2::new(conf);
 
     client.set_bucket_id("70660217d75b3a7a77900d14".to_string());
 
@@ -52,7 +53,7 @@ async fn main() {
         }
     }
 
-    if false{
+    if true{
         match client.get_upload_token().await{
             Ok(_v)=>{
                 println!(">>> upload_token successfull");
