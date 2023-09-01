@@ -38,6 +38,14 @@ pub async fn get_file(path:&str)->Result<FileInfo,&'static str>{
 
 }
 
+pub fn sha1_hash(v:&Vec<u8>)->String{
+    let mut hasher = Sha1::new();
+    hasher.update(v);
+    let result = hasher.finalize();
+    let hex_string = hex::encode(result);
+    hex_string
+}
+
 pub async fn read_as_json(path:&str)->Result<JsonValue,&'static str>{
     let read = read_as_string(path).await?;
     match parse(&read){
