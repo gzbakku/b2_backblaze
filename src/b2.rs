@@ -187,8 +187,17 @@ impl B2{
         ).await?;
         Ok(r)
     }
+    pub async fn download_raw_by_link(
+        link:&str
+    )->Result<Vec<u8>,&'static str>{
+        let r = download_raw_by_link(
+            link
+        ).await?;
+        Ok(r)
+    }
 }
 
+//download_raw_by_link
 
 async fn download_json_by_file_id(b2:&mut B2,file_id:&str)->Result<JsonValue,&'static str>{
 
@@ -247,6 +256,28 @@ async fn download_raw_by_file_id(b2:&mut B2,file_id:&str)->Result<Vec<u8>,&'stat
             // bucketId:JsonValue::String(b2.bucketId.clone())
             fileId:file_id
         }
+    ).await{
+        Ok(v)=>{
+            response = v;
+        },
+        Err(_)=>{
+            return Err("failed-response");
+        }
+    }
+
+    Ok(response)
+
+    // return Err("no_error");
+
+}
+
+async fn download_raw_by_link(link:&str)->Result<Vec<u8>,&'static str>{
+
+    let response;
+    match request::request_raw(
+        &link,
+        vec![],
+        object!{}
     ).await{
         Ok(v)=>{
             response = v;

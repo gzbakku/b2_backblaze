@@ -1,6 +1,6 @@
 [package]
 name = "b2_backblaze"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 
 description = "this is a basic async library to upload small files to backblaze b2 service."
