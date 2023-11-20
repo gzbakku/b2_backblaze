@@ -99,6 +99,12 @@ impl B2{
             Err(e)=>{return Err(e);}
         }
     }
+    pub async fn get_file_info(&mut self,file_id:&str)->Result<Option<JsonValue>,&'static str>{
+        match get_file_info(self,file_id).await{
+            Ok(v)=>{return Ok(v);},
+            Err(e)=>{return Err(e);}
+        }
+    }
     pub async fn get_base_download_url(&mut self)->Result<String,&'static str>{
         match self.check_token().await{
             Ok(_)=>{},
@@ -473,6 +479,58 @@ async fn get_upload_token(b2:&mut B2)->Result<UploadToken,&'static str>{
 }
 
 #[allow(non_snake_case)]
+async fn get_file_info(
+    b2:&mut B2,
+    fileId:&str,
+)->Result<Option<JsonValue>,&'static str>{
+
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
+
+    // let bid = &b2.bucketId;
+
+    let response:JsonValue;
+    match request::json(
+        &format!("{}/b2api/v2/b2_get_file_info",b2.apiUrl),
+        vec![
+            (
+                "Authorization".to_string(),
+                b2.authorizationToken.clone()
+            )
+        ],
+        object!{
+            fileId:JsonValue::String(fileId.to_string())
+        }
+    ).await{
+        Ok(v)=>{response = v;},
+        Err(_)=>{
+            return Err("failed-response");
+        }
+    }
+
+    if 
+        !response["action"].is_string()
+    {
+        let e = format!("{:?}",response);
+        if e.contains("no such file"){
+            return Ok(None);
+        }
+        println!("failed-b2-get_file_info => {:?}",response);
+        return Err("invalid-response");
+    }
+
+    // let build = object!{
+    //     fileId:response["fileId"].clone()
+    // };
+
+    return Ok(Some(response));
+
+}
+
+
+#[allow(non_snake_case)]
 async fn start_large_file(
     b2:&mut B2,
     bucketId:&str,
@@ -614,6 +672,10 @@ async fn finish_large_file(b2:&mut B2,fileId:&str,partSha1Array:JsonValue)->Resu
     // println!("finish_large_file : {:?}",response);
 
     if !response["action"].is_string(){
+        let e = format!("{:?}",response);
+        if e.contains("No active upload for:"){
+            return Ok(());
+        } 
         println!("finish_large_file-invalid-response : {:?}",response);
         return Err("invalid-response");
     }
