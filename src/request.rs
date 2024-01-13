@@ -79,6 +79,8 @@ pub async fn json(
         }
     }
 
+    // println!("{:?}",request);
+
     let response:reqwest::Response;
     match reqwest::Client::new().execute(request).await{
         Ok(v)=>{response = v;},

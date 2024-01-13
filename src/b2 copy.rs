@@ -16,15 +16,13 @@ fn _base64_encode(v:String)->String{
     STANDARD.encode(v)
 }
 
-// #[derive(Debug,Clone)]
-// #[allow(non_snake_case)]
+#[derive(Debug,Clone)]
+#[allow(non_snake_case)]
 
 use tokio::sync::Mutex;
 use std::sync::Arc;
 
-#[derive(Debug,Clone)]
-#[allow(non_snake_case)]
-pub struct Locked{
+struct Locked{
     pub in_session:bool,
     pub token_time:Instant,
     pub accountId:String,
@@ -58,28 +56,19 @@ impl UploadToken{
 #[allow(non_snake_case)]
 impl B2{
     pub fn new(config:Config)->B2{
-        let locked = Locked{
+        B2{
             in_session:false,
             token_time:Instant::now(),
+            config:config,
             accountId:String::new(),
             authorizationToken:String::new(),
             apiUrl:String::new(),
             downloadUrl:String::new(),
             bucketId:String::new()
-        };
-        B2{
-            config:config,
-            locked:Mutex::new(Arc::new(locked))
         }
     }
-    pub async fn set_bucket_id(&self,v:String){
-        let mut lock = self.locked.lock().await;
-        let hold = &*lock.clone();
-        let mut hold = hold.clone();
-        hold.bucketId = v;
-        *lock = Arc::new(hold);
-    }
-    pub async fn keep_trying_login(&self)->Result<(),&'static str>{
+    pub fn set_bucket_id(&mut self,v:String){self.bucketId = v;}
+    pub async fn keep_trying_login(&mut self)->Result<(),&'static str>{
         let mut time = 1000;
         loop{
             match self.login().await{
@@ -96,32 +85,19 @@ impl B2{
             }
         }
     }
-    pub async fn login(&self)->Result<(),&'static str>{
-        let mut lock = self.locked.lock().await;
-        let locked = &*lock.clone();
-        let creds;
-        match login_v3(&self.config).await{
-            Ok(_v)=>{creds = _v;},
-            Err(_e)=>{return Err(_e);}
+    pub async fn login(&mut self)->Result<(),&'static str>{
+        match login_v3(self).await{
+            Ok(_)=>{return Ok(());},
+            Err(e)=>{return Err(e);}
         }
-        let (
-            accountId,
-            authorizationToken,
-            apiUrl,
-            downloadUrl
-        ) = creds;
-        let mut locked = locked.clone();
-        locked.accountId = accountId;
-        locked.authorizationToken = authorizationToken;
-        locked.apiUrl = apiUrl;
-        locked.downloadUrl = downloadUrl;
-        locked.in_session = true;
-        locked.token_time = Instant::now();
-        let l = Arc::new(locked);
-        *lock = l.clone();
-        return Ok(());
     }
-    pub async fn get_upload_token(&self)->Result<UploadToken,&'static str>{
+    pub async fn login_v2(&mut self)->Result<(),&'static str>{
+        match login(self).await{
+            Ok(_)=>{return Ok(());},
+            Err(e)=>{return Err(e);}
+        }
+    }
+    pub async fn get_upload_token(&mut self)->Result<UploadToken,&'static str>{
         match get_upload_token(self).await{
             Ok(v)=>{return Ok(v);},
             Err(e)=>{return Err(e);}
@@ -129,7 +105,7 @@ impl B2{
     }
     #[allow(non_snake_case)]
     pub async fn start_large_file(
-        &self,
+        &mut self,
         bucketId:&str,
         fileName:&str,
         contentType:&str,
@@ -140,65 +116,57 @@ impl B2{
         }
     }
     #[allow(non_snake_case)]
-    pub async fn get_part_upload_token(&self,fileId:&str)->Result<UploadToken,&'static str>{
+    pub async fn get_part_upload_token(&mut self,fileId:&str)->Result<UploadToken,&'static str>{
         match get_part_upload_token(self,fileId).await{
             Ok(v)=>{return Ok(v);},
             Err(e)=>{return Err(e);}
         }
     }
     #[allow(non_snake_case)]
-    pub async fn finish_large_file(&self,fileId:&str,partSha1Array:JsonValue)->Result<(),&'static str>{
+    pub async fn finish_large_file(&mut self,fileId:&str,partSha1Array:JsonValue)->Result<(),&'static str>{
         match finish_large_file(self,fileId,partSha1Array).await{
             Ok(_v)=>{return Ok(());},
             Err(e)=>{return Err(e);}
         }
     }
-
-    pub async fn get_token(&self)->Result<Arc<Locked>,&'static str>{
-        self.check_token().await?;
-        let lock = self.locked.lock().await;
-        Ok(lock.clone())
-    }
-
-    pub async fn check_token(&self)->Result<(),&'static str>{
-        let lock = self.locked.lock().await;
-        let locked = &*lock.clone();
-        if 
-            !locked.in_session || 
-            locked.token_time.elapsed().as_secs() > 43200
-        {
-            self.login().await?;
+    pub async fn check_token(&mut self)->Result<(),&'static str>{
+        if !self.in_session || self.token_time.elapsed().as_secs() > 43200{
+            match self.login().await{
+                Ok(_)=>{
+                    self.in_session = true;
+                    return Ok(());
+                },
+                Err(_e)=>{return Err(_e);}
+            }
         }
-        Ok(())
+        return Ok(());
     }
-
-    pub async fn get_download_link(&self,file_name:&str,valid_seconds:u64)->Result<JsonValue,&'static str>{
+    pub async fn get_download_link(&mut self,file_name:&str,valid_seconds:u64)->Result<JsonValue,&'static str>{
         match get_download_link(self,file_name,valid_seconds).await{
             Ok(v)=>{return Ok(v);},
             Err(e)=>{return Err(e);}
         }
     }
-    pub async fn get_file_info(&self,file_id:&str)->Result<Option<JsonValue>,&'static str>{
+    pub async fn get_file_info(&mut self,file_id:&str)->Result<Option<JsonValue>,&'static str>{
         match get_file_info(self,file_id).await{
             Ok(v)=>{return Ok(v);},
             Err(e)=>{return Err(e);}
         }
     }
-    pub async fn get_base_download_url(&self)->Result<String,&'static str>{
-        // match self.check_token().await{
-        //     Ok(_)=>{},
-        //     Err(_e)=>{return Err(_e);}
-        // }
-        let b2 = self.get_token().await?;
-        Ok(b2.downloadUrl.clone())
+    pub async fn get_base_download_url(&mut self)->Result<String,&'static str>{
+        match self.check_token().await{
+            Ok(_)=>{},
+            Err(_e)=>{return Err(_e);}
+        }
+        Ok(self.downloadUrl.clone())
     }
-    pub async fn get_file_by_name(&self,file_name:&str)->Result<JsonValue,&'static str>{
+    pub async fn get_file_by_name(&mut self,file_name:&str)->Result<JsonValue,&'static str>{
         match get_file_by_name(self,file_name).await{
             Ok(v)=>{return Ok(v);},
             Err(e)=>{return Err(e);}
         }
     }
-    pub async fn cancel_large_file(&self,file_id:&str)->Result<JsonValue,&'static str>{
+    pub async fn cancel_large_file(&mut self,file_id:&str)->Result<JsonValue,&'static str>{
         match cancel_large_file(self,file_id).await{
             Ok(v)=>{return Ok(v);},
             Err(e)=>{return Err(e);}
@@ -206,7 +174,7 @@ impl B2{
     }
     #[allow(non_snake_case)]
     pub async fn delete_file_version(
-        &self,file_name:&str,b2_file_id:&str,bypassGovernance:bool
+        &mut self,file_name:&str,b2_file_id:&str,bypassGovernance:bool
     )->Result<JsonValue,&'static str>{
         match delete_file_version(self,file_name,b2_file_id,bypassGovernance).await{
             Ok(v)=>{return Ok(v);},
@@ -214,7 +182,7 @@ impl B2{
         }
     }
     pub async fn upload_bytes(
-        &self,
+        &mut self,
         upload_path:String,
         bytes:Vec<u8>,
         mime_type:&str,
@@ -230,7 +198,7 @@ impl B2{
         }
     }
     pub async fn upload(
-        &self,
+        &mut self,
         upload_path:String,
         file_path:String
     )->Result<(),&'static str>{
@@ -244,7 +212,7 @@ impl B2{
         }
     }
     pub async fn download_raw_by_file_id(
-        &self,
+        &mut self,
         file_id:&str
     )->Result<Vec<u8>,&'static str>{
         let r = download_raw_by_file_id(
@@ -254,7 +222,7 @@ impl B2{
         Ok(r)
     }
     pub async fn download_string_by_file_id(
-        &self,
+        &mut self,
         file_id:&str
     )->Result<String,&'static str>{
         let r = download_string_by_file_id(
@@ -264,7 +232,7 @@ impl B2{
         Ok(r)
     }
     pub async fn download_json_by_file_id(
-        &self,
+        &mut self,
         file_id:&str
     )->Result<JsonValue,&'static str>{
         let r = download_json_by_file_id(
@@ -285,7 +253,7 @@ impl B2{
 
 //download_raw_by_link
 
-async fn download_json_by_file_id(b2:&B2,file_id:&str)->Result<JsonValue,&'static str>{
+async fn download_json_by_file_id(b2:&mut B2,file_id:&str)->Result<JsonValue,&'static str>{
 
     let raw;
     match download_string_by_file_id(b2,file_id).await{
@@ -303,7 +271,7 @@ async fn download_json_by_file_id(b2:&B2,file_id:&str)->Result<JsonValue,&'stati
 
 }
 
-async fn download_string_by_file_id(b2:&B2,file_id:&str)->Result<String,&'static str>{
+async fn download_string_by_file_id(b2:&mut B2,file_id:&str)->Result<String,&'static str>{
 
     let raw;
     match download_raw_by_file_id(b2,file_id).await{
@@ -320,16 +288,14 @@ async fn download_string_by_file_id(b2:&B2,file_id:&str)->Result<String,&'static
 
 }
 
-async fn download_raw_by_file_id(b2:&B2,file_id:&str)->Result<Vec<u8>,&'static str>{
+async fn download_raw_by_file_id(b2:&mut B2,file_id:&str)->Result<Vec<u8>,&'static str>{
 
     // println!("download_raw_by_file_id");
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     let response;
     match request::request_raw(
@@ -382,7 +348,7 @@ async fn download_raw_by_link(link:&str)->Result<Vec<u8>,&'static str>{
 }
 
 async fn upload_bytes(
-    b2:&B2,
+    b2:&mut B2,
     mut upload_path:String,
     bytes:Vec<u8>,
     mime_type:&str,
@@ -423,7 +389,7 @@ async fn upload_bytes(
 }
 
 async fn upload(
-    b2:&B2,
+    b2:&mut B2,
     mut upload_path:String,
     file_path:String
 )->Result<JsonValue,&'static str>{
@@ -459,14 +425,11 @@ async fn upload(
 
 }
 
-#[allow(non_snake_case)]
-async fn login_v3(config:&Config)->Result<(
-    String,String,String,String
-),&'static str>{
+async fn login_v3(b2:&mut B2)->Result<(),&'static str>{
 
     // println!("{:?}",b2.config);
 
-    let token = format!("{}:{}",config.id,config.key);
+    let token = format!("{}:{}",b2.config.id,b2.config.key);
     let encoded = _base64_encode(token);
     let build_token = encoded;
 
@@ -507,46 +470,34 @@ async fn login_v3(config:&Config)->Result<(
         return Err("invalid-response");
     }
 
-    let accountId;
     match response["accountId"].as_str(){
-        Some(v)=>{accountId = v.to_string();},
+        Some(v)=>{b2.accountId = v.to_string();},
         None=>{return Err("failed-get-accountId");}
     }
-    let authorizationToken;
     match response["authorizationToken"].as_str(){
-        Some(v)=>{authorizationToken = v.to_string();},
+        Some(v)=>{b2.authorizationToken = v.to_string();},
         None=>{return Err("failed-get-authorizationToken");}
     }
-    let apiUrl;
     match response["apiInfo"]["storageApi"]["apiUrl"].as_str(){
-        Some(v)=>{apiUrl = v.to_string();},
+        Some(v)=>{b2.apiUrl = v.to_string();},
         None=>{return Err("failed-get-apiUrl");}
     }
-    let downloadUrl ;
     match response["apiInfo"]["storageApi"]["downloadUrl"].as_str(){
-        Some(v)=>{downloadUrl = v.to_string();},
+        Some(v)=>{b2.downloadUrl = v.to_string();},
         None=>{return Err("failed-get-downloadUrl");}
     }
 
-    // b2.in_session = true;
+    b2.in_session = true;
 
-    return Ok((
-        accountId,
-        authorizationToken,
-        apiUrl,
-        downloadUrl
-    ));
+    return Ok(());
 
 }
 
-#[allow(non_snake_case)]
-async fn _login_v2(config:&Config)->Result<(
-    String,String,String,String
-),&'static str>{
+async fn login(b2:&mut B2)->Result<(),&'static str>{
 
     // println!("{:?}",b2.config);
 
-    let token = format!("{}:{}",config.id,config.key);
+    let token = format!("{}:{}",b2.config.id,b2.config.key);
     let encoded = _base64_encode(token);
     let build_token = encoded;
 
@@ -582,48 +533,35 @@ async fn _login_v2(config:&Config)->Result<(
         return Err("invalid-response");
     }
 
-    let accountId;
     match response["accountId"].as_str(){
-        Some(v)=>{accountId = v.to_string();},
+        Some(v)=>{b2.accountId = v.to_string();},
         None=>{return Err("failed-get-accountId");}
     }
-    let authorizationToken;
     match response["authorizationToken"].as_str(){
-        Some(v)=>{authorizationToken = v.to_string();},
+        Some(v)=>{b2.authorizationToken = v.to_string();},
         None=>{return Err("failed-get-authorizationToken");}
     }
-    let apiUrl;
     match response["apiUrl"].as_str(){
-        Some(v)=>{apiUrl = v.to_string();},
+        Some(v)=>{b2.apiUrl = v.to_string();},
         None=>{return Err("failed-get-apiUrl");}
     }
-    let downloadUrl;
     match response["downloadUrl"].as_str(){
-        Some(v)=>{downloadUrl = v.to_string();},
+        Some(v)=>{b2.downloadUrl = v.to_string();},
         None=>{return Err("failed-get-downloadUrl");}
     }
 
-    // b2.in_session = true;
+    b2.in_session = true;
 
-    return Ok((
-        accountId,
-        authorizationToken,
-        apiUrl,
-        downloadUrl
-    ));
+    return Ok(());
 
 }
 
-async fn get_upload_token(b2:&B2)->Result<UploadToken,&'static str>{
+async fn get_upload_token(b2:&mut B2)->Result<UploadToken,&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
-
-    // println!("{:?}",b2);
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     let response:JsonValue;
     match request::json(
@@ -648,7 +586,6 @@ async fn get_upload_token(b2:&B2)->Result<UploadToken,&'static str>{
         !response["uploadUrl"].is_string() || 
         !response["authorizationToken"].is_string()
     {
-        println!("{}",json::stringify_pretty(response, 1));
         return Err("invalid-response");
     }
 
@@ -669,16 +606,14 @@ async fn get_upload_token(b2:&B2)->Result<UploadToken,&'static str>{
 
 #[allow(non_snake_case)]
 async fn get_file_info(
-    b2:&B2,
+    b2:&mut B2,
     fileId:&str,
 )->Result<Option<JsonValue>,&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     // let bid = &b2.bucketId;
 
@@ -723,18 +658,16 @@ async fn get_file_info(
 
 #[allow(non_snake_case)]
 async fn start_large_file(
-    b2:&B2,
+    b2:&mut B2,
     bucketId:&str,
     fileName:&str,
     contentType:&str,
 )->Result<JsonValue,&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     let bid;
     if bucketId.len() > 0{
@@ -786,14 +719,12 @@ async fn start_large_file(
 }
 
 #[allow(non_snake_case)]
-async fn get_part_upload_token(b2:&B2,fileId:&str)->Result<UploadToken,&'static str>{
+async fn get_part_upload_token(b2:&mut B2,fileId:&str)->Result<UploadToken,&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     let response:JsonValue;
     match request::json(
@@ -837,14 +768,12 @@ async fn get_part_upload_token(b2:&B2,fileId:&str)->Result<UploadToken,&'static 
 }
 
 #[allow(non_snake_case)]
-async fn finish_large_file(b2:&B2,fileId:&str,partSha1Array:JsonValue)->Result<(),&'static str>{
+async fn finish_large_file(b2:&mut B2,fileId:&str,partSha1Array:JsonValue)->Result<(),&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     let response:JsonValue;
     match request::json(
@@ -890,14 +819,12 @@ async fn finish_large_file(b2:&B2,fileId:&str,partSha1Array:JsonValue)->Result<(
 
 }
 
-async fn get_download_link(b2:&B2,file_name:&str,valid_seconds:u64)->Result<JsonValue,&'static str>{
+async fn get_download_link(b2:&mut B2,file_name:&str,valid_seconds:u64)->Result<JsonValue,&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     match request::json(
         &format!("{}/b2api/v2/b2_get_download_authorization",b2.apiUrl),
@@ -922,14 +849,12 @@ async fn get_download_link(b2:&B2,file_name:&str,valid_seconds:u64)->Result<Json
 
 }
 
-async fn get_file_by_name(b2:&B2,file_name:&str)->Result<JsonValue,&'static str>{
+async fn get_file_by_name(b2:&mut B2,file_name:&str)->Result<JsonValue,&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     match request::json(
         &format!("{}/b2api/v2/b2_list_file_names",b2.apiUrl),
@@ -946,9 +871,12 @@ async fn get_file_by_name(b2:&B2,file_name:&str)->Result<JsonValue,&'static str>
         }
     ).await{
         Ok(mut v)=>{
+            // println!("\n{}\n",json::stringify_pretty(v.clone(), 2));
             if !v["files"].is_array(){return Err("invalid_response");}
             if v["files"].len() == 0{return Err("not_found");}
             let file = v["files"][0].take();
+            // println!("\n{}\n",json::stringify_pretty(file.clone(), 2));
+            // println!("fileName : {:?}",file["fileName"]);
             if file["fileName"].as_str().unwrap() != file_name{return Err("not_found");}
             return Ok(file);
         },
@@ -960,14 +888,12 @@ async fn get_file_by_name(b2:&B2,file_name:&str)->Result<JsonValue,&'static str>
 
 }
 
-async fn cancel_large_file(b2:&B2,b2_file_id:&str)->Result<JsonValue,&'static str>{
+async fn cancel_large_file(b2:&mut B2,b2_file_id:&str)->Result<JsonValue,&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     match request::json(
         &format!("{}/b2api/v2/b2_cancel_large_file",b2.apiUrl),
@@ -992,18 +918,16 @@ async fn cancel_large_file(b2:&B2,b2_file_id:&str)->Result<JsonValue,&'static st
 
 #[allow(non_snake_case)]
 async fn delete_file_version(
-    b2:&B2,
+    b2:&mut B2,
     file_name:&str,
     b2_file_id:&str,
     bypassGovernance:bool
 )->Result<JsonValue,&'static str>{
 
-    // match b2.check_token().await{
-    //     Ok(_)=>{},
-    //     Err(_e)=>{return Err(_e);}
-    // }
-
-    let b2 = b2.get_token().await?;
+    match b2.check_token().await{
+        Ok(_)=>{},
+        Err(_e)=>{return Err(_e);}
+    }
 
     match request::json(
         &format!("{}/b2api/v2/b2_delete_file_version",b2.apiUrl),

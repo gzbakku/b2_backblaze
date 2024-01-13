@@ -2,6 +2,13 @@
 
 this is a full support async library to access backblaze b2 service backend apis.
 
+## changes
+
+    -crate have some performance changes but sadly this breaks the b2 api, although it can be fixed very quickly.
+    -b2 now holds creds in a Arc Mutex and shares a Arc of creds to each request, which enables multiple request to run in parallel and only one login request at a time
+    -try again api is added, this api keeps logging in with a time interval until login is successful
+    -each request will check session and login if required
+
 ## features
 
 - single file upload

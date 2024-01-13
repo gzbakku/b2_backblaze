@@ -42,7 +42,7 @@ async fn main(){
 
     let mut client = B2::new(conf);
 
-    client.set_bucket_id("70660217d75b3a7a77900d14".to_string());
+    client.set_bucket_id("70660217d75b3a7a77900d14".to_string()).await;
 
     match client.login().await{
         Ok(_)=>{
@@ -64,10 +64,11 @@ async fn main(){
         }
     }
 
-    if true{
+    if false{
         match client.upload(
-            "emails/some_email/drink.png".to_string(),
-            "d://workstation/expo/rust/letterman/letterman/drink.png".to_string()
+            "samples/sample.png".to_string(),
+            // "d://workstation/expo/rust/letterman/letterman/drink.png".to_string()
+            "./sample.png".to_string()
         ).await{
             Ok(_v)=>{
                 println!(">>> upload successfull");
@@ -81,7 +82,7 @@ async fn main(){
 }
 
 // #[tokio::main]
-async fn another() {
+async fn _another() {
 
     //start b2 client
     let mut client = B2::new(Config::new(

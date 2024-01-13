@@ -1,6 +1,6 @@
 [package]
 name = "b2_backblaze"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 
 description = "this is a basic async library to upload small files to backblaze b2 service."
@@ -17,7 +17,10 @@ license = "GPL-3.0"
 reqwest = {version="0.11.8",features=["json"]}
 tokio = { version = "1.15.0", features = ["full"] }
 json = "0.12.4"
-base64 = "0.13.0"
+
+# base64 = "0.13.0"
+base64 = "0.21.7"
+
 new_mime_guess = "4.0.0"
 sha1 = "0.10.0"
 hex = "0.4.3"
