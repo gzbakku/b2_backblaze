@@ -218,14 +218,14 @@ impl B2{
         upload_path:String,
         bytes:Vec<u8>,
         mime_type:&str,
-    )->Result<(),&'static str>{
+    )->Result<JsonValue,&'static str>{
         match upload_bytes(
             self,
             upload_path,
             bytes,
             mime_type
         ).await{
-            Ok(_)=>{return Ok(());},
+            Ok(v)=>{return Ok(v);},
             Err(e)=>{return Err(e);}
         }
     }
