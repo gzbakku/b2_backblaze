@@ -57,6 +57,15 @@ impl UploadToken{
 
 #[allow(non_snake_case)]
 impl B2{
+    pub async fn get_download_url(&self)->String{
+        self.locked.lock().await.downloadUrl.clone()
+    }
+    pub async fn get_api_url(&self)->String{
+        self.locked.lock().await.apiUrl.clone()
+    }
+    pub async fn get_authorization_token(&self)->String{
+        self.locked.lock().await.authorizationToken.clone()
+    }
     pub fn new(config:Config)->B2{
         let locked = Locked{
             in_session:false,
